@@ -192,8 +192,8 @@ func (a *API) joinGame(c *gin.Context) {
 func (a *API) getGames(c *gin.Context) {
 	userID := c.GetInt("userID")
 	rows, err := a.db.Query(`
-		SELECT id, player1_id, player2_id, status, current_turn, winner_id, created_at, updated_at 
-		FROM games WHERE player1_id = $1 OR player2_id = $1 
+		SELECT id, player1_id, player2_id, status, current_turn, winner_id, created_at, updated_at
+		FROM games WHERE player1_id = $1 OR player2_id = $1
 		ORDER BY updated_at DESC`, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -201,10 +201,11 @@ func (a *API) getGames(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var games []models.Game
+	// Initialize with empty slice to ensure JSON returns [] instead of null
+	games := make([]models.Game, 0)
 	for rows.Next() {
 		var game models.Game
-		err := rows.Scan(&game.ID, &game.Player1ID, &game.Player2ID, &game.Status, 
+		err := rows.Scan(&game.ID, &game.Player1ID, &game.Player2ID, &game.Status,
 			&game.CurrentTurn, &game.WinnerID, &game.CreatedAt, &game.UpdatedAt)
 		if err != nil {
 			continue
@@ -226,7 +227,7 @@ func (a *API) getGame(c *gin.Context) {
 	err = a.db.QueryRow(`
 		SELECT id, player1_id, player2_id, status, current_turn, winner_id, created_at, updated_at 
 		FROM games WHERE id = $1`, gameID).Scan(
-		&game.ID, &game.Player1ID, &game.Player2ID, &game.Status, 
+		&game.ID, &game.Player1ID, &game.Player2ID, &game.Status,
 		&game.CurrentTurn, &game.WinnerID, &game.CreatedAt, &game.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Game not found"})
@@ -302,10 +303,11 @@ func (a *API) getGameMoves(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var moves []models.Move
+	// Initialize with empty slice to ensure JSON returns [] instead of null
+	moves := make([]models.Move, 0)
 	for rows.Next() {
 		var move models.Move
-		err := rows.Scan(&move.ID, &move.GameID, &move.PlayerID, &move.X, &move.Y, 
+		err := rows.Scan(&move.ID, &move.GameID, &move.PlayerID, &move.X, &move.Y,
 			&move.IsHit, &move.ShipID, &move.CreatedAt)
 		if err != nil {
 			continue
@@ -339,7 +341,7 @@ func (a *API) sendChatMessage(c *gin.Context) {
 		VALUES ($1, $2, $3) 
 		RETURNING id, game_id, player_id, message, created_at`,
 		gameID, userID, req.Message).Scan(
-		&chatMessage.ID, &chatMessage.GameID, &chatMessage.PlayerID, 
+		&chatMessage.ID, &chatMessage.GameID, &chatMessage.PlayerID,
 		&chatMessage.Message, &chatMessage.CreatedAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -365,10 +367,11 @@ func (a *API) getChatMessages(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var messages []models.ChatMessage
+	// Initialize with empty slice to ensure JSON returns [] instead of null
+	messages := make([]models.ChatMessage, 0)
 	for rows.Next() {
 		var message models.ChatMessage
-		err := rows.Scan(&message.ID, &message.GameID, &message.PlayerID, 
+		err := rows.Scan(&message.ID, &message.GameID, &message.PlayerID,
 			&message.Message, &message.CreatedAt)
 		if err != nil {
 			continue
@@ -391,17 +394,18 @@ func (a *API) getLeaderboard(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var leaderboard []struct {
+	// Initialize with empty slice to ensure JSON returns [] instead of null
+	leaderboard := make([]struct {
 		models.Score
 		Username string `json:"username"`
-	}
+	}, 0)
 
 	for rows.Next() {
 		var entry struct {
 			models.Score
 			Username string `json:"username"`
 		}
-		err := rows.Scan(&entry.ID, &entry.PlayerID, &entry.Username, &entry.Wins, 
+		err := rows.Scan(&entry.ID, &entry.PlayerID, &entry.Username, &entry.Wins,
 			&entry.Losses, &entry.Hits, &entry.Misses, &entry.Points)
 		if err != nil {
 			continue

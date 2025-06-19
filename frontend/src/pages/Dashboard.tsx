@@ -22,11 +22,13 @@ const Dashboard: React.FC = () => {
         gameAPI.getGames(),
         userAPI.getStats()
       ]);
-      setGames(gamesData);
+      setGames(gamesData || []);
       setStats(statsData);
     } catch (err: any) {
       setError('Failed to load dashboard data');
       console.error(err);
+      // Set empty arrays on error to prevent null reference errors
+      setGames([]);
     } finally {
       setLoading(false);
     }
@@ -35,10 +37,10 @@ const Dashboard: React.FC = () => {
   const createNewGame = async () => {
     setCreating(true);
     setError('');
-    
+
     try {
       const newGame = await gameAPI.createGame();
-      setGames([newGame, ...games]);
+      setGames([newGame, ...(games || [])]);
     } catch (err: any) {
       setError('Failed to create game');
       console.error(err);
@@ -113,7 +115,7 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
         
-        {games.length === 0 ? (
+        {!games || games.length === 0 ? (
           <p>No games yet. Create your first game!</p>
         ) : (
           <div>
