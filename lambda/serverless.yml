@@ -1,0 +1,59 @@
+service: battleship-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: provided.al2
+  architecture: x86_64
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    JWT_SECRET: ${env:JWT_SECRET}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - rds:DescribeDBInstances
+            - rds:Connect
+          Resource: "*"
+
+functions:
+  api:
+    handler: bootstrap
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: ANY
+    timeout: 30
+
+  websocket:
+    handler: bootstrap-ws
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+      - websocket:
+          route: $default
+
+package:
+  patterns:
+    - '!./**'
+    - './bootstrap'
+    - './bootstrap-ws'
+
+plugins:
+  - serverless-domain-manager
+
+custom:
+  customDomain:
+    domainName: api.battleship.yourdomain.com
+    basePath: ''
+    stage: ${self:provider.stage}
+    createRoute53Record: true
