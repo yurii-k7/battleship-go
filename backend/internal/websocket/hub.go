@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -122,8 +123,16 @@ func HandleWebSocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract user and game info from query parameters
-	userID := 0 // This should be extracted from JWT token
-	gameID := 0 // This should be extracted from query parameters
+	userID := 0 // TODO: Extract from JWT token in query params
+	gameIDStr := r.URL.Query().Get("gameId")
+	gameID := 0
+	if gameIDStr != "" {
+		if id, err := strconv.Atoi(gameIDStr); err == nil {
+			gameID = id
+		}
+	}
+
+	log.Printf("WebSocket connection: UserID %d, GameID %d", userID, gameID)
 
 	client := &Client{
 		hub:    hub,

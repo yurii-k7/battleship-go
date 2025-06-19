@@ -151,6 +151,11 @@
   opacity: 0.7;
 }
 
+.game-cell.invalid {
+  background-color: #ffcccc;
+  opacity: 0.7;
+}
+
 .game-cell:disabled {
   cursor: not-allowed;
 }

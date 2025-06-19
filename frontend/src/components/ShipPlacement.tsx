@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Ship } from '../types';
 
 interface ShipPlacementProps {
@@ -21,6 +21,7 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
   const [currentShipIndex, setCurrentShipIndex] = useState(0);
   const [isVertical, setIsVertical] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [isPlacing, setIsPlacing] = useState(false);
 
   const currentShip = SHIP_TYPES[currentShipIndex];
 
@@ -45,12 +46,18 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
     return true;
   };
 
-  const placeShip = (x: number, y: number) => {
-    if (!currentShip || !canPlaceShip(x, y, currentShip.size, isVertical)) {
+  const placeShip = useCallback((x: number, y: number) => {
+    if (isPlacing || !currentShip || !canPlaceShip(x, y, currentShip.size, isVertical)) {
       return;
     }
 
-    const newBoard = board.map(row => [...row]);
+    setIsPlacing(true);
+
+    // Create a clean board without preview cells
+    const newBoard = board.map(row =>
+      row.map(cell => (cell === 'preview' || cell === 'invalid') ? 'empty' : cell)
+    );
+
     const newShip: Ship = {
       type: currentShip.type,
       size: currentShip.size,
@@ -68,61 +75,74 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
       newBoard[placeY][placeX] = 'ship';
     }
 
+    // Update all state in a single batch
     setBoard(newBoard);
-    setShips([...ships, newShip]);
-    setCurrentShipIndex(currentShipIndex + 1);
-  };
+    setShips(prevShips => [...prevShips, newShip]);
+    setCurrentShipIndex(prevIndex => prevIndex + 1);
 
-  const handleCellClick = (x: number, y: number) => {
-    if (currentShipIndex < SHIP_TYPES.length) {
+    // Reset placing flag after a short delay
+    setTimeout(() => setIsPlacing(false), 100);
+  }, [board, currentShip, isVertical, isPlacing, canPlaceShip]);
+
+  const handleCellClick = useCallback((x: number, y: number) => {
+    // Prevent multiple clicks and ensure we have a valid ship to place
+    if (isPlacing || currentShipIndex >= SHIP_TYPES.length || !currentShip) {
+      return;
+    }
+
+    // Only place if the position is valid
+    if (canPlaceShip(x, y, currentShip.size, isVertical)) {
       placeShip(x, y);
     }
-  };
+  }, [isPlacing, currentShipIndex, currentShip, canPlaceShip, isVertical, placeShip]);
 
-  const handleCellMouseEnter = (x: number, y: number) => {
-    if (currentShipIndex >= SHIP_TYPES.length) return;
+  const handleCellMouseEnter = useCallback((x: number, y: number) => {
+    if (currentShipIndex >= SHIP_TYPES.length || !currentShip || isPlacing) return;
 
-    const newBoard = board.map(row => [...row]);
-    
-    // Clear previous preview
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 10; col++) {
-        if (newBoard[row][col] === 'preview') {
-          newBoard[row][col] = 'empty';
-        }
-      }
-    }
+    // Use a more efficient approach to update preview
+    setBoard(prevBoard => {
+      const newBoard = prevBoard.map(row =>
+        row.map(cell => (cell === 'preview' || cell === 'invalid') ? 'empty' : cell)
+      );
 
-    // Show preview if placement is valid
-    if (canPlaceShip(x, y, currentShip.size, isVertical)) {
+      const isValidPlacement = canPlaceShip(x, y, currentShip.size, isVertical);
+
+      // Show preview for valid placement or invalid indicator
       for (let i = 0; i < currentShip.size; i++) {
         const previewX = isVertical ? x : x + i;
         const previewY = isVertical ? y + i : y;
-        if (newBoard[previewY][previewX] === 'empty') {
-          newBoard[previewY][previewX] = 'preview';
+
+        // Check bounds
+        if (previewX >= 0 && previewX < 10 && previewY >= 0 && previewY < 10) {
+          if (newBoard[previewY][previewX] === 'empty') {
+            newBoard[previewY][previewX] = isValidPlacement ? 'preview' : 'invalid';
+          }
         }
       }
-    }
 
-    setBoard(newBoard);
-  };
+      return newBoard;
+    });
+  }, [currentShipIndex, currentShip, isPlacing, isVertical, canPlaceShip]);
 
   const clearPreview = () => {
-    const newBoard = board.map(row => [...row]);
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 10; col++) {
-        if (newBoard[row][col] === 'preview') {
-          newBoard[row][col] = 'empty';
-        }
-      }
-    }
-    setBoard(newBoard);
+    setBoard(prevBoard =>
+      prevBoard.map(row =>
+        row.map(cell => (cell === 'preview' || cell === 'invalid') ? 'empty' : cell)
+      )
+    );
   };
 
   const resetPlacement = () => {
     setBoard(Array(10).fill(null).map(() => Array(10).fill('empty')));
     setShips([]);
     setCurrentShipIndex(0);
+    setIsPlacing(false);
+  };
+
+  const handleOrientationChange = (vertical: boolean) => {
+    setIsVertical(vertical);
+    // Clear any existing preview when orientation changes
+    clearPreview();
   };
 
   const getCellClass = (cellState: string): string => {
@@ -145,7 +165,7 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
               <input
                 type="checkbox"
                 checked={isVertical}
-                onChange={(e) => setIsVertical(e.target.checked)}
+                onChange={(e) => handleOrientationChange(e.target.checked)}
               />
               Vertical orientation
             </label>
