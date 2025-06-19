@@ -48,6 +48,7 @@ func SetupRoutes(router *gin.Engine, db *sql.DB, hub *websocket.Hub) {
 		protected.POST("/games", api.createGame)
 		protected.POST("/games/:id/join", api.joinGame)
 		protected.GET("/games", api.getGames)
+		protected.GET("/games/available", api.getAvailableGames)
 		protected.GET("/games/:id", api.getGame)
 		protected.POST("/games/:id/ships", api.placeShips)
 		protected.POST("/games/:id/moves", api.makeMove)
@@ -193,8 +194,36 @@ func (a *API) getGames(c *gin.Context) {
 	userID := c.GetInt("userID")
 	rows, err := a.db.Query(`
 		SELECT id, player1_id, player2_id, status, current_turn, winner_id, created_at, updated_at
-		FROM games WHERE player1_id = $1 OR player2_id = $1
+		FROM games WHERE (player1_id = $1 OR player2_id = $1)
+		   OR (status = 'waiting' AND player2_id IS NULL AND player1_id != $1)
 		ORDER BY updated_at DESC`, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	// Initialize with empty slice to ensure JSON returns [] instead of null
+	games := make([]models.Game, 0)
+	for rows.Next() {
+		var game models.Game
+		err := rows.Scan(&game.ID, &game.Player1ID, &game.Player2ID, &game.Status,
+			&game.CurrentTurn, &game.WinnerID, &game.CreatedAt, &game.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		games = append(games, game)
+	}
+
+	c.JSON(http.StatusOK, games)
+}
+
+func (a *API) getAvailableGames(c *gin.Context) {
+	userID := c.GetInt("userID")
+	rows, err := a.db.Query(`
+		SELECT id, player1_id, player2_id, status, current_turn, winner_id, created_at, updated_at
+		FROM games WHERE status = 'waiting' AND player2_id IS NULL AND player1_id != $1
+		ORDER BY created_at DESC`, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

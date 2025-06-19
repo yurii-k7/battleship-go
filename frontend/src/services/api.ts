@@ -72,6 +72,11 @@ export const gameAPI = {
     return response.data || [];
   },
 
+  getAvailableGames: async (): Promise<Game[]> => {
+    const response = await api.get('/games/available');
+    return response.data || [];
+  },
+
   getGame: async (gameId: number): Promise<Game> => {
     const response = await api.get(`/games/${gameId}`);
     return response.data;
