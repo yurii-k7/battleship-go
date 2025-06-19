@@ -51,8 +51,8 @@ const Game: React.FC = () => {
       if (gameData.status === 'waiting') {
         setGamePhase('waiting');
       } else if (gameData.status === 'active') {
-        // Check if ships are placed
-        setGamePhase('playing'); // Simplified for now
+        // Check if current user has placed ships
+        await checkShipPlacementStatus(gameData.id);
       } else {
         setGamePhase('finished');
       }
@@ -65,18 +65,25 @@ const Game: React.FC = () => {
     }
   };
 
+  const checkShipPlacementStatus = async (gameId: number) => {
+    // For now, assume if game is active, we need to check if ships are placed
+    // In a real implementation, you'd call an API to check ship placement status
+    // For simplicity, we'll assume ships need to be placed when game becomes active
+    setGamePhase('placing');
+  };
+
   const connectWebSocket = () => {
     websocketService.connect(parseInt(gameId!));
-    
+
     websocketService.on('game_update', (message: any) => {
       loadGameData();
     });
-    
+
     websocketService.on('move', (message: any) => {
       setMoves(prev => [...prev, message.data]);
       updateBoards();
     });
-    
+
     websocketService.on('chat', (message: any) => {
       setChatMessages(prev => [...prev, message.data]);
     });
@@ -167,7 +174,45 @@ const Game: React.FC = () => {
   };
 
   const isMyTurn = (): boolean => {
-    return game?.current_turn === user?.id;
+    if (!game || !user) return false;
+
+    // During waiting phase, no one has a turn
+    if (game.status === 'waiting') return false;
+
+    // During active phase, check current_turn
+    if (game.status === 'active') {
+      return game.current_turn === user.id;
+    }
+
+    // Game is finished, no one has a turn
+    return false;
+  };
+
+  const getTurnDisplayText = (): string => {
+    if (!game || !user) return 'Loading...';
+
+    switch (game.status) {
+      case 'waiting':
+        return 'Waiting for opponent';
+      case 'active':
+        if (game.current_turn === user.id) {
+          return 'Your turn';
+        } else if (game.current_turn) {
+          return "Opponent's turn";
+        } else {
+          return 'Game starting...';
+        }
+      case 'finished':
+        if (game.winner_id === user.id) {
+          return 'You won!';
+        } else if (game.winner_id) {
+          return 'You lost';
+        } else {
+          return 'Game ended';
+        }
+      default:
+        return 'Unknown status';
+    }
   };
 
   if (loading) {
@@ -186,8 +231,8 @@ const Game: React.FC = () => {
         {error && <div className="error-message">{error}</div>}
         
         <div style={{ marginBottom: '1rem' }}>
-          <strong>Status:</strong> {game.status} | 
-          <strong> Turn:</strong> {isMyTurn() ? 'Your turn' : "Opponent's turn"}
+          <strong>Status:</strong> {game.status} |
+          <strong> Turn:</strong> {getTurnDisplayText()}
         </div>
 
         {gamePhase === 'waiting' && (
