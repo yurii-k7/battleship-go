@@ -160,6 +160,55 @@
   cursor: not-allowed;
 }
 
+/* Enhanced ship placement styles */
+.game-cell:not(:disabled):hover {
+  background-color: #5bb3ff;
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}
+
+.game-cell.ship:hover {
+  background-color: #555;
+  transform: none;
+}
+
+/* Ship placement instructions */
+.ship-placement-instructions {
+  background-color: var(--message-bg, #f8f9fa);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #646cff;
+}
+
+.ship-placement-progress {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.ship-placement-step {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.ship-placement-step.completed {
+  background-color: #28a745;
+  color: white;
+}
+
+.ship-placement-step.current {
+  background-color: #646cff;
+  color: white;
+}
+
+.ship-placement-step.pending {
+  background-color: #e9ecef;
+  color: #6c757d;
+}
+
 /* Chat */
 .chat-container {
   width: 300px;

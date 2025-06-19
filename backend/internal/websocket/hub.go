@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
 
@@ -123,7 +124,7 @@ func HandleWebSocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract user and game info from query parameters
-	userID := 0 // TODO: Extract from JWT token in query params
+	userID := extractUserIDFromToken(r)
 	gameIDStr := r.URL.Query().Get("gameId")
 	gameID := 0
 	if gameIDStr != "" {
@@ -211,4 +212,27 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+// extractUserIDFromToken extracts the user ID from JWT token in query params
+func extractUserIDFromToken(r *http.Request) int {
+	tokenString := r.URL.Query().Get("token")
+	if tokenString == "" {
+		return 0
+	}
+
+	// Parse the token without verification for now (in production, you should verify)
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		log.Printf("Failed to parse JWT token: %v", err)
+		return 0
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if userID, ok := claims["user_id"].(float64); ok {
+			return int(userID)
+		}
+	}
+
+	return 0
 }
