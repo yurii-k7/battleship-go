@@ -509,6 +509,16 @@ func (a *API) sendChatMessage(c *gin.Context) {
 		return
 	}
 
+	// Broadcast chat message to all clients in the game
+	chatMsg := map[string]interface{}{
+		"type":    "chat",
+		"game_id": gameID,
+		"data":    chatMessage,
+	}
+	if msgBytes, err := json.Marshal(chatMsg); err == nil {
+		a.hub.BroadcastToGame(gameID, msgBytes)
+	}
+
 	c.JSON(http.StatusCreated, chatMessage)
 }
 

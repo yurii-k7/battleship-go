@@ -71,7 +71,7 @@ const Game: React.FC = () => {
 
       setGame(gameData);
       setMoves(movesData);
-      setChatMessages(chatData);
+      setChatMessages(Array.isArray(chatData) ? chatData.filter(msg => msg && msg.id && msg.player_id !== undefined) : []);
       
       // Initialize boards
       initializeBoards();
@@ -141,7 +141,17 @@ const Game: React.FC = () => {
     });
 
     websocketService.on('chat', (message: any) => {
-      setChatMessages(prev => [...prev, message.data]);
+      if (message && message.data && message.data.id && message.data.player_id !== undefined) {
+        setChatMessages(prev => {
+          // Check if message already exists to prevent duplicates
+          if (prev.find(msg => msg.id === message.data.id)) {
+            return prev;
+          }
+          return [...prev, message.data];
+        });
+      } else {
+        console.warn('Invalid chat message received:', message);
+      }
     });
   };
 
@@ -270,8 +280,8 @@ const Game: React.FC = () => {
   const handleChatMessage = async (message: string) => {
     try {
       const chatMessage = await chatAPI.sendMessage(parseInt(gameId!), message);
-      setChatMessages(prev => [...prev, chatMessage]);
-      websocketService.sendChatMessage(parseInt(gameId!), message);
+      // Don't add locally - let the websocket broadcast handle it to avoid duplicates
+      // The backend will broadcast the message to all clients including the sender
     } catch (err: any) {
       console.error('Failed to send chat message:', err);
     }

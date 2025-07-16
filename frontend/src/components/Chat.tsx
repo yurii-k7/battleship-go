@@ -46,7 +46,7 @@ const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUserId }) =
             No messages yet. Start the conversation!
           </p>
         ) : (
-          messages.map((message) => (
+          messages.filter(message => message && message.id).map((message) => (
             <div 
               key={message.id} 
               className={`chat-message ${message.player_id === currentUserId ? 'own-message' : ''}`}
@@ -61,10 +61,10 @@ const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, currentUserId }) =
                   {message.player_id === currentUserId ? 'You' : 'Opponent'}
                 </strong>
                 <span style={{ fontSize: '0.8em', color: '#666' }}>
-                  {formatTime(message.created_at)}
+                  {message.created_at ? formatTime(message.created_at) : ''}
                 </span>
               </div>
-              <div>{message.message}</div>
+              <div>{message.message || ''}</div>
             </div>
           ))
         )}
