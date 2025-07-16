@@ -57,6 +57,7 @@ func SetupRoutes(router *gin.Engine, db *sql.DB, hub *websocket.Hub) {
 		protected.GET("/games/available", api.getAvailableGames)
 		protected.GET("/games/:id", api.getGame)
 		protected.GET("/games/:id/ships", api.getShips)
+		protected.GET("/games/:id/ships/sunk", api.getSunkShips)
 		protected.GET("/games/:id/ready", api.checkGameReady)
 		protected.POST("/games/:id/ships", api.placeShips)
 		protected.POST("/games/:id/moves", api.makeMove)
@@ -311,6 +312,36 @@ func (a *API) getShips(c *gin.Context) {
 	rows, err := a.db.Query(`
 		SELECT id, game_id, player_id, type, size, start_x, start_y, end_x, end_y, is_vertical, is_sunk 
 		FROM ships WHERE game_id = $1 AND player_id = $2`, gameID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	ships := make([]models.Ship, 0)
+	for rows.Next() {
+		var ship models.Ship
+		err := rows.Scan(&ship.ID, &ship.GameID, &ship.PlayerID, &ship.Type, &ship.Size,
+			&ship.StartX, &ship.StartY, &ship.EndX, &ship.EndY, &ship.IsVertical, &ship.IsSunk)
+		if err != nil {
+			continue
+		}
+		ships = append(ships, ship)
+	}
+
+	c.JSON(http.StatusOK, ships)
+}
+
+func (a *API) getSunkShips(c *gin.Context) {
+	gameID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid game ID"})
+		return
+	}
+
+	rows, err := a.db.Query(`
+		SELECT id, game_id, player_id, type, size, start_x, start_y, end_x, end_y, is_vertical, is_sunk 
+		FROM ships WHERE game_id = $1 AND is_sunk = true`, gameID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

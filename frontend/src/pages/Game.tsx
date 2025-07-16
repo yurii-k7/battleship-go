@@ -13,6 +13,7 @@ const Game: React.FC = () => {
   const { user } = useAuth();
   const [game, setGame] = useState<GameType | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
+  const [sunkShips, setSunkShips] = useState<Ship[]>([]);
   const [moves, setMoves] = useState<Move[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [playerBoard, setPlayerBoard] = useState<CellState[][]>([]);
@@ -37,12 +38,12 @@ const Game: React.FC = () => {
     };
   }, [gameId, errorTimeout]);
 
-  // Update boards when ships or moves change
+  // Update boards when ships, sunk ships, or moves change
   useEffect(() => {
-    if (ships.length > 0 || moves.length > 0) {
+    if (ships.length > 0 || moves.length > 0 || sunkShips.length > 0) {
       updateBoards();
     }
-  }, [ships, moves]);
+  }, [ships, sunkShips, moves]);
 
   const setErrorWithTimeout = (message: string) => {
     // Clear existing timeout if any
@@ -72,6 +73,15 @@ const Game: React.FC = () => {
       setGame(gameData);
       setMoves(movesData);
       setChatMessages(Array.isArray(chatData) ? chatData.filter(msg => msg && msg.id && msg.player_id !== undefined) : []);
+
+      // Load sunk ships separately to avoid breaking the game if this fails
+      try {
+        const sunkShipsData = await gameAPI.getSunkShips(parseInt(gameId!));
+        setSunkShips(sunkShipsData || []);
+      } catch (err) {
+        console.warn('Failed to load sunk ships:', err);
+        setSunkShips([]);
+      }
       
       // Initialize boards
       initializeBoards();
@@ -108,6 +118,14 @@ const Game: React.FC = () => {
       
       setGame(gameData);
       setMoves(movesData);
+
+      // Load sunk ships separately to avoid breaking the refresh if this fails
+      try {
+        const sunkShipsData = await gameAPI.getSunkShips(parseInt(gameId!));
+        setSunkShips(sunkShipsData || []);
+      } catch (err) {
+        console.warn('Failed to refresh sunk ships:', err);
+      }
     } catch (err) {
       console.error('Failed to refresh game state:', err);
     }
@@ -177,13 +195,30 @@ const Game: React.FC = () => {
 
     // Place ships on player board
     ships.forEach(ship => {
+      const cellState = ship.is_sunk ? 'sunk' : 'ship';
       if (ship.is_vertical) {
         for (let y = ship.start_y; y <= ship.end_y; y++) {
-          newPlayerBoard[y][ship.start_x] = 'ship';
+          newPlayerBoard[y][ship.start_x] = cellState;
         }
       } else {
         for (let x = ship.start_x; x <= ship.end_x; x++) {
-          newPlayerBoard[ship.start_y][x] = 'ship';
+          newPlayerBoard[ship.start_y][x] = cellState;
+        }
+      }
+    });
+
+    // Apply sunk ships to opponent's board
+    sunkShips.forEach(ship => {
+      if (ship.player_id !== user?.id) {
+        // This is an opponent's sunk ship, mark it on opponent board
+        if (ship.is_vertical) {
+          for (let y = ship.start_y; y <= ship.end_y; y++) {
+            newOpponentBoard[y][ship.start_x] = 'sunk';
+          }
+        } else {
+          for (let x = ship.start_x; x <= ship.end_x; x++) {
+            newOpponentBoard[ship.start_y][x] = 'sunk';
+          }
         }
       }
     });
@@ -192,13 +227,17 @@ const Game: React.FC = () => {
     moves.forEach(move => {
       console.log('Processing move:', move);
       if (move.player_id === user?.id) {
-        // My move on opponent's board
+        // My move on opponent's board - only update if not already sunk
         console.log('My move on opponent board:', move.x, move.y, move.is_hit ? 'hit' : 'miss');
-        newOpponentBoard[move.y][move.x] = move.is_hit ? 'hit' : 'miss';
+        if (newOpponentBoard[move.y][move.x] !== 'sunk') {
+          newOpponentBoard[move.y][move.x] = move.is_hit ? 'hit' : 'miss';
+        }
       } else {
-        // Opponent's move on my board
+        // Opponent's move on my board - only update if not already sunk
         console.log('Opponent move on my board:', move.x, move.y, move.is_hit ? 'hit' : 'miss');
-        newPlayerBoard[move.y][move.x] = move.is_hit ? 'hit' : 'miss';
+        if (newPlayerBoard[move.y][move.x] !== 'sunk') {
+          newPlayerBoard[move.y][move.x] = move.is_hit ? 'hit' : 'miss';
+        }
       }
     });
 
