@@ -20,7 +20,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, onCellClick, disabled = fa
             key={`${x}-${y}`}
             className={getCellClass(cell)}
             onClick={() => onCellClick(x, y)}
-            disabled={disabled || cell === 'hit' || cell === 'miss'}
+            disabled={disabled || cell === 'hit' || cell === 'miss' || cell === 'sunk'}
             title={`${x}, ${y}`}
           />
         ))
