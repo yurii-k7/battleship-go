@@ -273,17 +273,46 @@ func (g *GameService) validateShipPlacement(ships []models.Ship) error {
 }
 
 func (g *GameService) checkAndUpdateSunkShip(gameID, shipID int) {
-	// Count hits on this ship
-	var hitCount, shipSize int
-	g.db.QueryRow(`
-		SELECT COUNT(m.id), s.size 
-		FROM moves m 
-		JOIN ships s ON m.ship_id = s.id 
-		WHERE s.id = $1 AND m.is_hit = true`, shipID).Scan(&hitCount, &shipSize)
+	// Get ship details
+	var ship models.Ship
+	err := g.db.QueryRow(`
+		SELECT id, game_id, player_id, type, size, start_x, start_y, end_x, end_y, is_vertical, is_sunk
+		FROM ships WHERE id = $1`, shipID).Scan(
+		&ship.ID, &ship.GameID, &ship.PlayerID, &ship.Type, &ship.Size,
+		&ship.StartX, &ship.StartY, &ship.EndX, &ship.EndY, &ship.IsVertical, &ship.IsSunk)
+	if err != nil {
+		return
+	}
 
-	fmt.Printf("Ship %d: %d hits out of %d size\n", shipID, hitCount, shipSize)
+	// Count hits on each position of this ship
+	hitCount := 0
+	if ship.IsVertical {
+		for y := ship.StartY; y <= ship.EndY; y++ {
+			var moveExists int
+			g.db.QueryRow(`
+				SELECT COUNT(*) FROM moves 
+				WHERE game_id = $1 AND x = $2 AND y = $3 AND is_hit = true`,
+				gameID, ship.StartX, y).Scan(&moveExists)
+			if moveExists > 0 {
+				hitCount++
+			}
+		}
+	} else {
+		for x := ship.StartX; x <= ship.EndX; x++ {
+			var moveExists int
+			g.db.QueryRow(`
+				SELECT COUNT(*) FROM moves 
+				WHERE game_id = $1 AND x = $2 AND y = $3 AND is_hit = true`,
+				gameID, x, ship.StartY).Scan(&moveExists)
+			if moveExists > 0 {
+				hitCount++
+			}
+		}
+	}
 
-	if hitCount >= shipSize {
+	fmt.Printf("Ship %d: %d hits out of %d size\n", shipID, hitCount, ship.Size)
+
+	if hitCount >= ship.Size {
 		fmt.Printf("Ship %d is sunk!\n", shipID)
 		g.db.Exec("UPDATE ships SET is_sunk = true WHERE id = $1", shipID)
 	}
