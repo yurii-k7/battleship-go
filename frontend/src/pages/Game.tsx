@@ -17,9 +17,10 @@ const Game: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [playerBoard, setPlayerBoard] = useState<CellState[][]>([]);
   const [opponentBoard, setOpponentBoard] = useState<CellState[][]>([]);
-  const [gamePhase, setGamePhase] = useState<'waiting' | 'placing' | 'playing' | 'finished'>('waiting');
+  const [gamePhase, setGamePhase] = useState<'waiting' | 'placing' | 'waiting_for_opponent' | 'playing' | 'finished'>('waiting');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (gameId) {
@@ -29,8 +30,36 @@ const Game: React.FC = () => {
 
     return () => {
       websocketService.disconnect();
+      // Clear error timeout on unmount
+      if (errorTimeout) {
+        clearTimeout(errorTimeout);
+      }
     };
-  }, [gameId]);
+  }, [gameId, errorTimeout]);
+
+  // Update boards when ships or moves change
+  useEffect(() => {
+    if (ships.length > 0 || moves.length > 0) {
+      updateBoards();
+    }
+  }, [ships, moves]);
+
+  const setErrorWithTimeout = (message: string) => {
+    // Clear existing timeout if any
+    if (errorTimeout) {
+      clearTimeout(errorTimeout);
+    }
+    
+    setError(message);
+    
+    // Set new timeout to clear error after 3 seconds
+    const timeout = setTimeout(() => {
+      setError('');
+      setErrorTimeout(null);
+    }, 3000);
+    
+    setErrorTimeout(timeout);
+  };
 
   const loadGameData = async () => {
     try {
@@ -58,7 +87,7 @@ const Game: React.FC = () => {
       }
       
     } catch (err: any) {
-      setError('Failed to load game data');
+      setErrorWithTimeout('Failed to load game data');
       console.error(err);
     } finally {
       setLoading(false);
@@ -66,22 +95,49 @@ const Game: React.FC = () => {
   };
 
   const checkShipPlacementStatus = async (gameId: number) => {
-    // For now, assume if game is active, we need to check if ships are placed
-    // In a real implementation, you'd call an API to check ship placement status
-    // For simplicity, we'll assume ships need to be placed when game becomes active
-    setGamePhase('placing');
+    // Use the same logic as checkIfReadyToPlay for consistency
+    await checkIfReadyToPlay();
+  };
+
+  const refreshGameState = async () => {
+    try {
+      const [gameData, movesData] = await Promise.all([
+        gameAPI.getGame(parseInt(gameId!)),
+        gameAPI.getGameMoves(parseInt(gameId!))
+      ]);
+      
+      setGame(gameData);
+      setMoves(movesData);
+    } catch (err) {
+      console.error('Failed to refresh game state:', err);
+    }
   };
 
   const connectWebSocket = () => {
     websocketService.connect(parseInt(gameId!));
 
-    websocketService.on('game_update', (message: any) => {
-      loadGameData();
+    websocketService.on('game_update', async (message: any) => {
+      console.log('Game update received:', message);
+      
+      // Refresh game state first
+      await refreshGameState();
+      
+      // Then check for phase transitions based on current phase
+      const currentPhase = gamePhase;
+      if (currentPhase === 'waiting' || currentPhase === 'waiting_for_opponent') {
+        await checkIfReadyToPlay();
+      }
+    });
+
+    websocketService.on('ship_placement_update', async (message: any) => {
+      console.log('Ship placement update received:', message);
+      
+      // Check if both players have now placed ships
+      await checkIfReadyToPlay();
     });
 
     websocketService.on('move', (message: any) => {
       setMoves(prev => [...prev, message.data]);
-      updateBoards();
     });
 
     websocketService.on('chat', (message: any) => {
@@ -107,6 +163,8 @@ const Game: React.FC = () => {
       Array(10).fill('empty')
     );
 
+    console.log('Updating boards with', moves.length, 'moves for user', user?.id);
+
     // Place ships on player board
     ships.forEach(ship => {
       if (ship.is_vertical) {
@@ -122,11 +180,14 @@ const Game: React.FC = () => {
 
     // Apply moves to boards
     moves.forEach(move => {
+      console.log('Processing move:', move);
       if (move.player_id === user?.id) {
         // My move on opponent's board
+        console.log('My move on opponent board:', move.x, move.y, move.is_hit ? 'hit' : 'miss');
         newOpponentBoard[move.y][move.x] = move.is_hit ? 'hit' : 'miss';
       } else {
         // Opponent's move on my board
+        console.log('Opponent move on my board:', move.x, move.y, move.is_hit ? 'hit' : 'miss');
         newPlayerBoard[move.y][move.x] = move.is_hit ? 'hit' : 'miss';
       }
     });
@@ -139,27 +200,70 @@ const Game: React.FC = () => {
     try {
       await gameAPI.placeShips(parseInt(gameId!), placedShips);
       setShips(placedShips);
-      setGamePhase('playing');
-      updateBoards();
+      // Check if both players have placed ships to determine game phase
+      await checkIfReadyToPlay();
     } catch (err: any) {
-      setError('Failed to place ships');
-      console.error(err);
+      // If ships are already placed, just check if we can start playing
+      if (err.response?.data?.error === 'ships already placed') {
+        await checkIfReadyToPlay();
+      } else {
+        setErrorWithTimeout('Failed to place ships');
+        console.error(err);
+      }
+    }
+  };
+
+  const checkIfReadyToPlay = async () => {
+    try {
+      const readyStatus = await gameAPI.checkGameReady(parseInt(gameId!));
+      
+      if (readyStatus.ready) {
+        // Both players have placed ships, game is ready
+        const myShips = await gameAPI.getShips(parseInt(gameId!));
+        setShips(myShips);
+        setGamePhase('playing');
+      } else {
+        // Check if current player has placed ships
+        const myShips = await gameAPI.getShips(parseInt(gameId!));
+        if (myShips.length === 5) {
+          // Current player has placed ships, waiting for opponent
+          setShips(myShips);
+          setGamePhase('waiting_for_opponent');
+        } else {
+          // Current player still needs to place ships
+          setGamePhase('placing');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check game readiness:', err);
+      setGamePhase('placing');
     }
   };
 
   const handleCellClick = async (x: number, y: number) => {
+    console.log('Cell clicked:', x, y, 'types:', typeof x, typeof y, 'gamePhase:', gamePhase, 'isMyTurn:', isMyTurn());
+    
+    // Validate coordinates
+    if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 9 || y < 0 || y > 9) {
+      console.error('Invalid coordinates:', x, y);
+      setErrorWithTimeout('Invalid move coordinates');
+      return;
+    }
+    
     if (gamePhase !== 'playing' || !isMyTurn()) {
+      console.log('Move blocked - not playing or not my turn');
       return;
     }
 
     try {
+      console.log('Making move with coordinates:', x, y);
       const move = await gameAPI.makeMove(parseInt(gameId!), x, y);
+      console.log('Move successful:', move);
       setMoves(prev => [...prev, move]);
       websocketService.sendMove(parseInt(gameId!), x, y);
-      updateBoards();
     } catch (err: any) {
-      setError('Failed to make move');
-      console.error(err);
+      console.error('Move failed:', err);
+      setErrorWithTimeout(`Failed to make move: ${err.response?.data?.error || err.message}`);
     }
   };
 
@@ -244,6 +348,13 @@ const Game: React.FC = () => {
 
         {gamePhase === 'placing' && (
           <ShipPlacement onShipsPlaced={handleShipsPlaced} />
+        )}
+
+        {gamePhase === 'waiting_for_opponent' && (
+          <div>
+            <h2>Waiting for opponent to place ships...</h2>
+            <p>You have placed all your ships. Please wait for your opponent to finish placing their ships.</p>
+          </div>
         )}
 
         {gamePhase === 'playing' && (

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"battleship-go/internal/api"
+	"battleship-go/internal/cleanup"
 	"battleship-go/internal/config"
 	"battleship-go/internal/database"
 	"battleship-go/internal/websocket"
@@ -33,6 +34,10 @@ func main() {
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
+
+	// Initialize and start cleanup service
+	cleanupService := cleanup.NewCleanupService(db)
+	cleanupService.StartCleanupScheduler()
 
 	// Setup Gin router
 	router := gin.Default()

@@ -156,6 +156,20 @@
   opacity: 0.7;
 }
 
+.game-cell.preview-valid {
+  background-color: #90EE90;
+  opacity: 0.8;
+  border: 2px solid #228B22;
+  box-shadow: 0 0 5px rgba(34, 139, 34, 0.5);
+}
+
+.game-cell.preview-invalid {
+  background-color: #ffcccc;
+  opacity: 0.8;
+  border: 2px solid #dc3545;
+  box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
+}
+
 .game-cell:disabled {
   cursor: not-allowed;
 }

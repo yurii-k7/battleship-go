@@ -115,4 +115,11 @@ CREATE INDEX IF NOT EXISTS idx_games_players ON games(player1_id, player2_id);
 CREATE INDEX IF NOT EXISTS idx_moves_game ON moves(game_id);
 CREATE INDEX IF NOT EXISTS idx_ships_game_player ON ships(game_id, player_id);
 CREATE INDEX IF NOT EXISTS idx_chat_game ON chat_messages(game_id);
-CREATE INDEX IF NOT EXISTS idx_scores_points ON scores(points DESC);`
+CREATE INDEX IF NOT EXISTS idx_scores_points ON scores(points DESC);
+ALTER TABLE moves DROP CONSTRAINT IF EXISTS moves_game_id_x_y_key;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints 
+                   WHERE constraint_name = 'moves_game_player_position_key') THEN
+        ALTER TABLE moves ADD CONSTRAINT moves_game_player_position_key UNIQUE (game_id, player_id, x, y);
+    END IF;
+END $$;`

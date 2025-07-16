@@ -103,6 +103,17 @@ func (h *Hub) BroadcastToGame(gameID int, message []byte) {
 	}
 }
 
+func (h *Hub) BroadcastToAll(message []byte) {
+	for client := range h.clients {
+		select {
+		case client.send <- message:
+		default:
+			close(client.send)
+			delete(h.clients, client)
+		}
+	}
+}
+
 func (h *Hub) SendToUser(userID int, message []byte) {
 	for client := range h.clients {
 		if client.userID == userID {

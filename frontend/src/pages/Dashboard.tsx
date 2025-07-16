@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { gameAPI, userAPI } from '../services/api';
+import { websocketService } from '../services/websocket';
 import { Game, Score } from '../types';
 
 const Dashboard: React.FC = () => {
@@ -14,6 +15,25 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
+    
+    // Connect to WebSocket for real-time updates
+    websocketService.connect();
+    
+    // Listen for new game creation events
+    websocketService.on('new_game_created', (message: any) => {
+      console.log('New game created:', message);
+      loadDashboardData(); // Refresh the games list
+    });
+
+    // Listen for game updates (like when someone joins)
+    websocketService.on('game_update', (message: any) => {
+      console.log('Game updated:', message);
+      loadDashboardData(); // Refresh the games list
+    });
+
+    return () => {
+      websocketService.disconnect();
+    };
   }, []);
 
   const loadDashboardData = async () => {

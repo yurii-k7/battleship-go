@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Ship } from '../types';
 
 interface ShipPlacementProps {
@@ -20,6 +20,7 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
   const [ships, setShips] = useState<Ship[]>([]);
   const [currentShipIndex, setCurrentShipIndex] = useState(0);
   const [isVertical, setIsVertical] = useState(false);
+  const [hoveredCell, setHoveredCell] = useState<{x: number, y: number} | null>(null);
   const currentShip = SHIP_TYPES[currentShipIndex];
 
   // Debug logging
@@ -102,9 +103,36 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
     }
   };
 
-  // Simple cell class function - we'll add hover effects with CSS
+  // Get preview cells for ship placement
+  const getPreviewCells = (x: number, y: number): {x: number, y: number}[] => {
+    if (!currentShip || currentShipIndex >= SHIP_TYPES.length) return [];
+    
+    const cells: {x: number, y: number}[] = [];
+    for (let i = 0; i < currentShip.size; i++) {
+      const cellX = isVertical ? x : x + i;
+      const cellY = isVertical ? y + i : y;
+      cells.push({ x: cellX, y: cellY });
+    }
+    return cells;
+  };
+
+  // Check if cell is in preview
+  const isPreviewCell = (x: number, y: number): boolean => {
+    if (!hoveredCell) return false;
+    const previewCells = getPreviewCells(hoveredCell.x, hoveredCell.y);
+    return previewCells.some(cell => cell.x === x && cell.y === y);
+  };
+
+  // Simple cell class function with preview support
   const getCellClass = (x: number, y: number, cellState: string): string => {
-    return `game-cell ${cellState}`;
+    let classes = `game-cell ${cellState}`;
+    
+    if (isPreviewCell(x, y)) {
+      const canPlace = hoveredCell && canPlaceShip(hoveredCell.x, hoveredCell.y, currentShip?.size || 0, isVertical);
+      classes += canPlace ? ' preview-valid' : ' preview-invalid';
+    }
+    
+    return classes;
   };
 
   const resetPlacement = () => {
@@ -136,7 +164,7 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
               <input
                 type="checkbox"
                 checked={isVertical}
-                onChange={(e) => handleOrientationChange(e.target.checked)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleOrientationChange(e.target.checked)}
               />
               <span>Vertical orientation {isVertical ? '(↓)' : '(→)'}</span>
             </label>
@@ -149,12 +177,14 @@ const ShipPlacement: React.FC<ShipPlacementProps> = ({ onShipsPlaced }) => {
       </div>
 
       <div className="game-board">
-        {board.map((row, y) =>
-          row.map((cell, x) => (
+        {board.map((row: string[], y: number) =>
+          row.map((cell: string, x: number) => (
             <button
               key={`${x}-${y}`}
               className={getCellClass(x, y, cell)}
               onClick={() => handleCellClick(x, y)}
+              onMouseEnter={() => setHoveredCell({x, y})}
+              onMouseLeave={() => setHoveredCell(null)}
               disabled={allShipsPlaced}
             />
           ))

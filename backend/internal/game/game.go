@@ -90,6 +90,44 @@ func (g *GameService) PlaceShips(gameID, playerID int, ships []models.Ship) erro
 		}
 	}
 
+	// Check if both players have now placed their ships
+	err = g.checkAndStartGame(gameID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g *GameService) checkAndStartGame(gameID int) error {
+	// Get game info
+	var game models.Game
+	err := g.db.QueryRow(`
+		SELECT id, player1_id, player2_id, status, current_turn, winner_id, created_at, updated_at 
+		FROM games WHERE id = $1`, gameID).Scan(
+		&game.ID, &game.Player1ID, &game.Player2ID, &game.Status, &game.CurrentTurn, &game.WinnerID, &game.CreatedAt, &game.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	// Only proceed if game is active and has both players
+	if game.Status != models.GameStatusActive || game.Player2ID == nil {
+		return nil
+	}
+
+	// Check if both players have placed ships
+	var player1Ships, player2Ships int
+	g.db.QueryRow("SELECT COUNT(*) FROM ships WHERE game_id = $1 AND player_id = $2", gameID, game.Player1ID).Scan(&player1Ships)
+	g.db.QueryRow("SELECT COUNT(*) FROM ships WHERE game_id = $1 AND player_id = $2", gameID, *game.Player2ID).Scan(&player2Ships)
+
+	// If both players have placed ships and current_turn is NULL, set it to player1
+	if player1Ships == 5 && player2Ships == 5 && game.CurrentTurn == nil {
+		_, err = g.db.Exec("UPDATE games SET current_turn = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", game.Player1ID, gameID)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -112,9 +150,9 @@ func (g *GameService) MakeMove(gameID, playerID, x, y int) (*models.Move, error)
 		return nil, errors.New("not your turn")
 	}
 
-	// Check if move already exists
+	// Check if move already exists by this player
 	var existingMoveCount int
-	err = g.db.QueryRow("SELECT COUNT(*) FROM moves WHERE game_id = $1 AND x = $2 AND y = $3", gameID, x, y).Scan(&existingMoveCount)
+	err = g.db.QueryRow("SELECT COUNT(*) FROM moves WHERE game_id = $1 AND player_id = $2 AND x = $3 AND y = $4", gameID, playerID, x, y).Scan(&existingMoveCount)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +281,10 @@ func (g *GameService) checkAndUpdateSunkShip(gameID, shipID int) {
 		JOIN ships s ON m.ship_id = s.id 
 		WHERE s.id = $1 AND m.is_hit = true`, shipID).Scan(&hitCount, &shipSize)
 
+	fmt.Printf("Ship %d: %d hits out of %d size\n", shipID, hitCount, shipSize)
+
 	if hitCount >= shipSize {
+		fmt.Printf("Ship %d is sunk!\n", shipID)
 		g.db.Exec("UPDATE ships SET is_sunk = true WHERE id = $1", shipID)
 	}
 }
@@ -253,7 +294,12 @@ func (g *GameService) checkGameEnd(gameID, playerID int) bool {
 	g.db.QueryRow(`
 		SELECT COUNT(CASE WHEN is_sunk THEN 1 END), COUNT(*) 
 		FROM ships WHERE game_id = $1 AND player_id = $2`, gameID, playerID).Scan(&sunkShips, &totalShips)
-	return sunkShips == totalShips
+	
+	fmt.Printf("Game end check for player %d: %d sunk ships out of %d total\n", playerID, sunkShips, totalShips)
+	gameEnded := sunkShips == totalShips
+	fmt.Printf("Game ended: %v\n", gameEnded)
+	
+	return gameEnded
 }
 
 func (g *GameService) endGame(gameID, winnerID int) {

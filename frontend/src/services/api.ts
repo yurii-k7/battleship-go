@@ -82,6 +82,16 @@ export const gameAPI = {
     return response.data;
   },
 
+  getShips: async (gameId: number): Promise<Ship[]> => {
+    const response = await api.get(`/games/${gameId}/ships`);
+    return response.data;
+  },
+
+  checkGameReady: async (gameId: number): Promise<{ready: boolean, player1_ships: number, player2_ships: number, game_status: string}> => {
+    const response = await api.get(`/games/${gameId}/ready`);
+    return response.data;
+  },
+
   placeShips: async (gameId: number, ships: Ship[]): Promise<void> => {
     await api.post(`/games/${gameId}/ships`, ships);
   },
