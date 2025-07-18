@@ -11,6 +11,13 @@ import Chat from '../components/Chat';
 const Game: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
+  
+  // Helper function to safely parse gameId
+  const getGameIdNumber = (): number | null => {
+    if (!gameId) return null;
+    const parsed = parseInt(gameId, 10);
+    return isNaN(parsed) || parsed <= 0 ? null : parsed;
+  };
   const [game, setGame] = useState<GameType | null>(null);
   const [ships, setShips] = useState<Ship[]>([]);
   const [sunkShips, setSunkShips] = useState<Ship[]>([]);
@@ -63,11 +70,17 @@ const Game: React.FC = () => {
   };
 
   const loadGameData = async () => {
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) {
+      setErrorWithTimeout('Invalid game ID');
+      return;
+    }
+    
     try {
       const [gameData, movesData, chatData] = await Promise.all([
-        gameAPI.getGame(parseInt(gameId!)),
-        gameAPI.getGameMoves(parseInt(gameId!)),
-        chatAPI.getMessages(parseInt(gameId!))
+        gameAPI.getGame(gameIdNumber),
+        gameAPI.getGameMoves(gameIdNumber),
+        chatAPI.getMessages(gameIdNumber)
       ]);
 
       setGame(gameData);
@@ -76,7 +89,7 @@ const Game: React.FC = () => {
 
       // Load sunk ships separately to avoid breaking the game if this fails
       try {
-        const sunkShipsData = await gameAPI.getSunkShips(parseInt(gameId!));
+        const sunkShipsData = await gameAPI.getSunkShips(gameIdNumber);
         setSunkShips(sunkShipsData || []);
       } catch (err) {
         console.warn('Failed to load sunk ships:', err);
@@ -110,10 +123,13 @@ const Game: React.FC = () => {
   };
 
   const refreshGameState = async () => {
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) return;
+    
     try {
       const [gameData, movesData] = await Promise.all([
-        gameAPI.getGame(parseInt(gameId!)),
-        gameAPI.getGameMoves(parseInt(gameId!))
+        gameAPI.getGame(gameIdNumber),
+        gameAPI.getGameMoves(gameIdNumber)
       ]);
       
       setGame(gameData);
@@ -121,7 +137,7 @@ const Game: React.FC = () => {
 
       // Load sunk ships separately to avoid breaking the refresh if this fails
       try {
-        const sunkShipsData = await gameAPI.getSunkShips(parseInt(gameId!));
+        const sunkShipsData = await gameAPI.getSunkShips(gameIdNumber);
         setSunkShips(sunkShipsData || []);
       } catch (err) {
         console.warn('Failed to refresh sunk ships:', err);
@@ -132,7 +148,10 @@ const Game: React.FC = () => {
   };
 
   const connectWebSocket = () => {
-    websocketService.connect(parseInt(gameId!));
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) return;
+    
+    websocketService.connect(gameIdNumber);
 
     websocketService.on('game_update', async (message: any) => {
       console.log('Game update received:', message);
@@ -246,8 +265,11 @@ const Game: React.FC = () => {
   };
 
   const handleShipsPlaced = async (placedShips: Ship[]) => {
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) return;
+    
     try {
-      await gameAPI.placeShips(parseInt(gameId!), placedShips);
+      await gameAPI.placeShips(gameIdNumber, placedShips);
       setShips(placedShips);
       // Check if both players have placed ships to determine game phase
       await checkIfReadyToPlay();
@@ -263,17 +285,20 @@ const Game: React.FC = () => {
   };
 
   const checkIfReadyToPlay = async () => {
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) return;
+    
     try {
-      const readyStatus = await gameAPI.checkGameReady(parseInt(gameId!));
+      const readyStatus = await gameAPI.checkGameReady(gameIdNumber);
       
       if (readyStatus.ready) {
         // Both players have placed ships, game is ready
-        const myShips = await gameAPI.getShips(parseInt(gameId!));
+        const myShips = await gameAPI.getShips(gameIdNumber);
         setShips(myShips);
         setGamePhase('playing');
       } else {
         // Check if current player has placed ships
-        const myShips = await gameAPI.getShips(parseInt(gameId!));
+        const myShips = await gameAPI.getShips(gameIdNumber);
         if (myShips.length === 5) {
           // Current player has placed ships, waiting for opponent
           setShips(myShips);
@@ -292,8 +317,10 @@ const Game: React.FC = () => {
   const handleCellClick = async (x: number, y: number) => {
     console.log('Cell clicked:', x, y, 'types:', typeof x, typeof y, 'gamePhase:', gamePhase, 'isMyTurn:', isMyTurn());
     
-    // Validate coordinates
-    if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 9 || y < 0 || y > 9) {
+    // Validate coordinates more strictly
+    if (typeof x !== 'number' || typeof y !== 'number' || 
+        !Number.isInteger(x) || !Number.isInteger(y) || 
+        x < 0 || x > 9 || y < 0 || y > 9) {
       console.error('Invalid coordinates:', x, y);
       setErrorWithTimeout('Invalid move coordinates');
       return;
@@ -304,12 +331,15 @@ const Game: React.FC = () => {
       return;
     }
 
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) return;
+    
     try {
       console.log('Making move with coordinates:', x, y);
-      const move = await gameAPI.makeMove(parseInt(gameId!), x, y);
+      const move = await gameAPI.makeMove(gameIdNumber, x, y);
       console.log('Move successful:', move);
       setMoves(prev => [...prev, move]);
-      websocketService.sendMove(parseInt(gameId!), x, y);
+      websocketService.sendMove(gameIdNumber, x, y);
     } catch (err: any) {
       console.error('Move failed:', err);
       setErrorWithTimeout(`Failed to make move: ${err.response?.data?.error || err.message}`);
@@ -317,8 +347,11 @@ const Game: React.FC = () => {
   };
 
   const handleChatMessage = async (message: string) => {
+    const gameIdNumber = getGameIdNumber();
+    if (!gameIdNumber) return;
+    
     try {
-      const chatMessage = await chatAPI.sendMessage(parseInt(gameId!), message);
+      const chatMessage = await chatAPI.sendMessage(gameIdNumber, message);
       // Don't add locally - let the websocket broadcast handle it to avoid duplicates
       // The backend will broadcast the message to all clients including the sender
     } catch (err: any) {

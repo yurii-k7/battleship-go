@@ -63,16 +63,12 @@ jobs:
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
-        languages: javascript
+        languages: javascript-typescript
         queries: security-extended,security-and-quality
 
     - name: Install dependencies
       working-directory: ./frontend
       run: npm ci
-
-    - name: Build frontend
-      working-directory: ./frontend
-      run: npm run build
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
