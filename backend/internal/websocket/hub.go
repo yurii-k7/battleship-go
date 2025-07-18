@@ -66,13 +66,15 @@ func (h *Hub) Run() {
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				// Remove from game room first
 				if client.gameID > 0 && h.gameRooms[client.gameID] != nil {
 					delete(h.gameRooms[client.gameID], client)
 					if len(h.gameRooms[client.gameID]) == 0 {
 						delete(h.gameRooms, client.gameID)
 					}
 				}
+				// Close the send channel to signal writePump to exit
+				close(client.send)
 				log.Printf("Client unregistered: UserID %d, GameID %d", client.userID, client.gameID)
 			}
 
@@ -81,8 +83,9 @@ func (h *Hub) Run() {
 				select {
 				case client.send <- message:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					// Client's send channel is full or closed, unregister the client
+					log.Printf("Failed to send to client UserID %d, unregistering", client.userID)
+					h.unregister <- client
 				}
 			}
 		}
@@ -95,9 +98,9 @@ func (h *Hub) BroadcastToGame(gameID int, message []byte) {
 			select {
 			case client.send <- message:
 			default:
-				close(client.send)
-				delete(h.clients, client)
-				delete(gameClients, client)
+				// Client's send channel is full or closed, unregister the client
+				log.Printf("Failed to send to client UserID %d, unregistering", client.userID)
+				h.unregister <- client
 			}
 		}
 	}
@@ -108,8 +111,9 @@ func (h *Hub) BroadcastToAll(message []byte) {
 		select {
 		case client.send <- message:
 		default:
-			close(client.send)
-			delete(h.clients, client)
+			// Client's send channel is full or closed, unregister the client
+			log.Printf("Failed to send to client UserID %d, unregistering", client.userID)
+			h.unregister <- client
 		}
 	}
 }
@@ -120,8 +124,9 @@ func (h *Hub) SendToUser(userID int, message []byte) {
 			select {
 			case client.send <- message:
 			default:
-				close(client.send)
-				delete(h.clients, client)
+				// Client's send channel is full or closed, unregister the client
+				log.Printf("Failed to send to client UserID %d, unregistering", client.userID)
+				h.unregister <- client
 			}
 		}
 	}
@@ -162,6 +167,7 @@ func HandleWebSocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 func (c *Client) readPump() {
 	defer func() {
+		log.Printf("ReadPump closing for UserID %d, GameID %d", c.userID, c.gameID)
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
@@ -170,7 +176,7 @@ func (c *Client) readPump() {
 		_, messageBytes, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				log.Printf("WebSocket error for UserID %d: %v", c.userID, err)
 			}
 			break
 		}
@@ -207,18 +213,22 @@ func (c *Client) readPump() {
 }
 
 func (c *Client) writePump() {
-	defer c.conn.Close()
+	defer func() {
+		c.conn.Close()
+		log.Printf("WritePump closed for UserID %d, GameID %d", c.userID, c.gameID)
+	}()
 
 	for {
 		select {
 		case message, ok := <-c.send:
 			if !ok {
+				// Channel was closed, send close message and return
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				log.Println("WebSocket write error:", err)
+				log.Printf("WebSocket write error for UserID %d: %v", c.userID, err)
 				return
 			}
 		}
