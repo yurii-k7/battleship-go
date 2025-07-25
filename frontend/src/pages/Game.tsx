@@ -28,7 +28,7 @@ const Game: React.FC = () => {
   const [gamePhase, setGamePhase] = useState<'waiting' | 'placing' | 'waiting_for_opponent' | 'playing' | 'finished'>('waiting');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [errorTimeout, setErrorTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (gameId) {
@@ -445,12 +445,12 @@ const Game: React.FC = () => {
               <h3>Your Board</h3>
               <GameBoard 
                 board={playerBoard}
-                onCellClick={() => {}} // Player can't click their own board
+                onCellClick={() => undefined} // Player can't click their own board
                 disabled={true}
               />
             </div>
             <div>
-              <h3>Opponent's Board</h3>
+              <h3>Opponent&apos;s Board</h3>
               <GameBoard 
                 board={opponentBoard}
                 onCellClick={handleCellClick}

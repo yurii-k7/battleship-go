@@ -20,13 +20,13 @@ const Dashboard: React.FC = () => {
     websocketService.connect();
     
     // Listen for new game creation events
-    websocketService.on('new_game_created', (message: any) => {
+    websocketService.on('new_game_created', (message) => {
       console.log('New game created:', message);
       loadDashboardData(); // Refresh the games list
     });
 
     // Listen for game updates (like when someone joins)
-    websocketService.on('game_update', (message: any) => {
+    websocketService.on('game_update', (message) => {
       console.log('Game updated:', message);
       loadDashboardData(); // Refresh the games list
     });
@@ -44,7 +44,7 @@ const Dashboard: React.FC = () => {
       ]);
       setGames(gamesData || []);
       setStats(statsData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Failed to load dashboard data');
       console.error(err);
       // Set empty arrays on error to prevent null reference errors
@@ -61,7 +61,7 @@ const Dashboard: React.FC = () => {
     try {
       const newGame = await gameAPI.createGame();
       setGames([newGame, ...(games || [])]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Failed to create game');
       console.error(err);
     } finally {
@@ -73,7 +73,7 @@ const Dashboard: React.FC = () => {
     try {
       await gameAPI.joinGame(gameId);
       loadDashboardData(); // Refresh the games list
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Failed to join game');
       console.error(err);
     }

@@ -91,6 +91,6 @@ export interface WebSocketMessage {
   type: 'chat' | 'move' | 'game_update' | 'join_game' | 'ship_placement';
   game_id?: number;
   user_id?: number;
-  data?: any;
+  data?: unknown;
   message?: string;
 }

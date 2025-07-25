@@ -19,7 +19,7 @@ const Login: React.FC = () => {
     try {
       await login(username, password);
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.response?.data?.error || 'Login failed');
     } finally {
       setLoading(false);
@@ -63,7 +63,7 @@ const Login: React.FC = () => {
       </form>
       
       <p style={{ textAlign: 'center', marginTop: '1rem', color: '#666' }}>
-        Don't have an account? <Link to="/register">Register here</Link>
+        Don&apos;t have an account? <Link to="/register">Register here</Link>
       </p>
     </div>
   );

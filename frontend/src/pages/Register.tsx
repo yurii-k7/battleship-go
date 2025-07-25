@@ -32,7 +32,7 @@ const Register: React.FC = () => {
     try {
       await register(username, email, password);
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);

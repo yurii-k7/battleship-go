@@ -2,7 +2,7 @@ import { WebSocketMessage } from '../types';
 
 class WebSocketService {
   private socket: WebSocket | null = null;
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<string, ((message: WebSocketMessage) => void)[]> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -101,7 +101,7 @@ class WebSocketService {
     }
   }
 
-  sendShipPlacement(gameId: number, ships: any[]): void {
+  sendShipPlacement(gameId: number, ships: unknown[]): void {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.sendMessage({
         type: 'ship_placement',
@@ -111,20 +111,23 @@ class WebSocketService {
     }
   }
 
-  private sendMessage(message: any): void {
+  private sendMessage(message: unknown): void {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
     }
   }
 
-  on(event: string, callback: Function): void {
+  on(event: string, callback: (message: WebSocketMessage) => void): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
-    this.listeners.get(event)!.push(callback);
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.push(callback);
+    }
   }
 
-  off(event: string, callback: Function): void {
+  off(event: string, callback: (message: WebSocketMessage) => void): void {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       const index = eventListeners.indexOf(callback);

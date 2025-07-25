@@ -10,7 +10,8 @@ export default [
     languageOptions: { 
       globals: {
         ...globals.browser,
-        ...globals.jest
+        ...globals.jest,
+        ...globals.node
       },
       parser: tsParser,
       parserOptions: {
