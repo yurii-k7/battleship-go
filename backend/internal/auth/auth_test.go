@@ -49,7 +49,7 @@ func TestAuthService_Register(t *testing.T) {
 
 	t.Run("successful registration", func(t *testing.T) {
 		user, err := authService.Register("testuser", "test@example.com", "password123")
-		
+
 		assert.NoError(t, err)
 		assert.NotNil(t, user)
 		assert.Equal(t, "testuser", user.Username)
@@ -59,14 +59,14 @@ func TestAuthService_Register(t *testing.T) {
 
 	t.Run("duplicate username", func(t *testing.T) {
 		_, err := authService.Register("testuser", "test2@example.com", "password123")
-		
+
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user already exists")
 	})
 
 	t.Run("duplicate email", func(t *testing.T) {
 		_, err := authService.Register("testuser2", "test@example.com", "password123")
-		
+
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user already exists")
 	})
@@ -84,7 +84,7 @@ func TestAuthService_Login(t *testing.T) {
 
 	t.Run("successful login", func(t *testing.T) {
 		user, token, err := authService.Login("testuser", "password123")
-		
+
 		assert.NoError(t, err)
 		assert.NotNil(t, user)
 		assert.NotEmpty(t, token)
@@ -93,14 +93,14 @@ func TestAuthService_Login(t *testing.T) {
 
 	t.Run("invalid username", func(t *testing.T) {
 		_, _, err := authService.Login("nonexistent", "password123")
-		
+
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid credentials")
 	})
 
 	t.Run("invalid password", func(t *testing.T) {
 		_, _, err := authService.Login("testuser", "wrongpassword")
-		
+
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid credentials")
 	})

@@ -323,11 +323,11 @@ func (g *GameService) checkGameEnd(gameID, playerID int) bool {
 	g.db.QueryRow(`
 		SELECT COUNT(CASE WHEN is_sunk THEN 1 END), COUNT(*) 
 		FROM ships WHERE game_id = $1 AND player_id = $2`, gameID, playerID).Scan(&sunkShips, &totalShips)
-	
+
 	fmt.Printf("Game end check for player %d: %d sunk ships out of %d total\n", playerID, sunkShips, totalShips)
 	gameEnded := sunkShips == totalShips
 	fmt.Printf("Game ended: %v\n", gameEnded)
-	
+
 	return gameEnded
 }
 
@@ -338,7 +338,7 @@ func (g *GameService) endGame(gameID, winnerID int) {
 
 	// Update scores
 	g.updatePlayerScore(winnerID, true)
-	
+
 	// Get loser ID
 	var loserID int
 	g.db.QueryRow(`

@@ -83,7 +83,7 @@ func TestGameService_CreateGame(t *testing.T) {
 
 	t.Run("successful game creation", func(t *testing.T) {
 		game, err := gameService.CreateGame(1)
-		
+
 		assert.NoError(t, err)
 		assert.NotNil(t, game)
 		assert.Equal(t, 1, game.Player1ID)
@@ -104,7 +104,7 @@ func TestGameService_JoinGame(t *testing.T) {
 
 	t.Run("successful join", func(t *testing.T) {
 		joinedGame, err := gameService.JoinGame(game.ID, 2)
-		
+
 		assert.NoError(t, err)
 		assert.NotNil(t, joinedGame)
 		assert.Equal(t, 1, joinedGame.Player1ID)

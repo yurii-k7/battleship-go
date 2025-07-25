@@ -25,17 +25,17 @@ type Game struct {
 }
 
 type Ship struct {
-	ID        int    `json:"id" db:"id"`
-	GameID    int    `json:"game_id" db:"game_id"`
-	PlayerID  int    `json:"player_id" db:"player_id"`
-	Type      string `json:"type" db:"type"` // carrier, battleship, cruiser, submarine, destroyer
-	Size      int    `json:"size" db:"size"`
-	StartX    int    `json:"start_x" db:"start_x"`
-	StartY    int    `json:"start_y" db:"start_y"`
-	EndX      int    `json:"end_x" db:"end_x"`
-	EndY      int    `json:"end_y" db:"end_y"`
-	IsVertical bool  `json:"is_vertical" db:"is_vertical"`
-	IsSunk    bool   `json:"is_sunk" db:"is_sunk"`
+	ID         int    `json:"id" db:"id"`
+	GameID     int    `json:"game_id" db:"game_id"`
+	PlayerID   int    `json:"player_id" db:"player_id"`
+	Type       string `json:"type" db:"type"` // carrier, battleship, cruiser, submarine, destroyer
+	Size       int    `json:"size" db:"size"`
+	StartX     int    `json:"start_x" db:"start_x"`
+	StartY     int    `json:"start_y" db:"start_y"`
+	EndX       int    `json:"end_x" db:"end_x"`
+	EndY       int    `json:"end_y" db:"end_y"`
+	IsVertical bool   `json:"is_vertical" db:"is_vertical"`
+	IsSunk     bool   `json:"is_sunk" db:"is_sunk"`
 }
 
 type Move struct {

@@ -448,7 +448,6 @@ func (a *API) makeMove(c *gin.Context) {
 		Y *int `json:"y" binding:"required,min=0,max=9"`
 	}
 
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fmt.Printf("Failed to bind move JSON: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -465,7 +464,7 @@ func (a *API) makeMove(c *gin.Context) {
 	}
 
 	fmt.Printf("Move successful: %+v\n", move)
-	
+
 	// Broadcast game update to all clients in the game
 	gameUpdateMsg := map[string]interface{}{
 		"type":    "game_update",
@@ -475,7 +474,7 @@ func (a *API) makeMove(c *gin.Context) {
 	if msgBytes, err := json.Marshal(gameUpdateMsg); err == nil {
 		a.hub.BroadcastToGame(gameID, msgBytes)
 	}
-	
+
 	c.JSON(http.StatusOK, move)
 }
 
