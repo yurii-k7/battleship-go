@@ -291,8 +291,8 @@ func (g *GameService) checkAndUpdateSunkShip(gameID, shipID int) {
 			var moveExists int
 			g.db.QueryRow(`
 				SELECT COUNT(*) FROM moves 
-				WHERE game_id = $1 AND x = $2 AND y = $3 AND is_hit = true`,
-				gameID, ship.StartX, y).Scan(&moveExists)
+				WHERE game_id = $1 AND x = $2 AND y = $3 AND is_hit = true AND player_id != $4`,
+				gameID, ship.StartX, y, ship.PlayerID).Scan(&moveExists)
 			if moveExists > 0 {
 				hitCount++
 			}
@@ -302,8 +302,8 @@ func (g *GameService) checkAndUpdateSunkShip(gameID, shipID int) {
 			var moveExists int
 			g.db.QueryRow(`
 				SELECT COUNT(*) FROM moves 
-				WHERE game_id = $1 AND x = $2 AND y = $3 AND is_hit = true`,
-				gameID, x, ship.StartY).Scan(&moveExists)
+				WHERE game_id = $1 AND x = $2 AND y = $3 AND is_hit = true AND player_id != $4`,
+				gameID, x, ship.StartY, ship.PlayerID).Scan(&moveExists)
 			if moveExists > 0 {
 				hitCount++
 			}
